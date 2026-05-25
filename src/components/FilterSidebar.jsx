@@ -15,13 +15,17 @@ import { Filter, Sparkles } from "lucide-react";
  * @param {number} props.filterCriteria.minStipend Minimum stipend range selection
  * @param {string} props.filterCriteria.maxDuration Maximum duration selection
  * @param {boolean} props.filterCriteria.ppoOnly Pre-Placement Offer checkbox
+ * @param {Array} props.uniqueProfiles Extracted list of unique profiles passed from App.jsx
+ * @param {Array} props.uniqueLocations Extracted list of unique locations passed from App.jsx
  * @param {Function} props.onFilterChange Callback function triggered on filter changes: (key, value) => void
  * @param {Function} props.onClearAll Callback to reset filters
  */
 export default function FilterSidebar({
   filterCriteria,
   onFilterChange,
-  onClearAll
+  onClearAll,
+  uniqueProfiles = [],
+  uniqueLocations = []
 }) {
   const {
     profileQuery = "",
@@ -32,6 +36,45 @@ export default function FilterSidebar({
     maxDuration = "all",
     ppoOnly = false
   } = filterCriteria || {};
+
+  // Dropdown visibility states
+  const [profileFocused, setProfileFocused] = React.useState(false);
+  const [locationFocused, setLocationFocused] = React.useState(false);
+
+  // Helper: Get active query segment after the last comma
+  const getCurrentInputSegment = (queryStr) => {
+    if (!queryStr) return "";
+    const segments = queryStr.split(",");
+    return segments[segments.length - 1].trim();
+  };
+
+  // Helper: Update input state with selection (retains previous comma-separated elements)
+  const handleSelectOption = (key, currentVal, optionSelected) => {
+    const segments = currentVal.split(",");
+    if (segments.length > 1) {
+      segments[segments.length - 1] = " " + optionSelected;
+      onFilterChange && onFilterChange(key, segments.join(", "));
+    } else {
+      onFilterChange && onFilterChange(key, optionSelected);
+    }
+  };
+
+  // Dynamic suggestion lists based on active segment input
+  const filteredProfiles = React.useMemo(() => {
+    const segment = getCurrentInputSegment(profileQuery).toLowerCase();
+    if (!segment) return uniqueProfiles.slice(0, 10);
+    return uniqueProfiles
+      .filter(p => p.toLowerCase().includes(segment))
+      .slice(0, 10);
+  }, [uniqueProfiles, profileQuery]);
+
+  const filteredLocations = React.useMemo(() => {
+    const segment = getCurrentInputSegment(locationQuery).toLowerCase();
+    if (!segment) return uniqueLocations.slice(0, 10);
+    return uniqueLocations
+      .filter(l => l.toLowerCase().includes(segment))
+      .slice(0, 10);
+  }, [uniqueLocations, locationQuery]);
 
   const handleTextChange = (key, e) => {
     onFilterChange && onFilterChange(key, e.target.value);
@@ -77,6 +120,8 @@ export default function FilterSidebar({
               placeholder="e.g. React Developer" 
               value={profileQuery}
               onChange={(e) => handleTextChange("profileQuery", e)}
+              onFocus={() => setProfileFocused(true)}
+              onBlur={() => setTimeout(() => setProfileFocused(false), 200)}
               className="w-full px-2.5 py-1.5 text-xs border border-[#e0e0e0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00A5EC]/20 focus:border-[#00A5EC] transition-all text-slate-805 bg-white font-medium placeholder:text-slate-400"
             />
             {profileQuery && (
@@ -86,6 +131,24 @@ export default function FilterSidebar({
               >
                 ✕
               </button>
+            )}
+
+            {/* Profile suggestions pop-up */}
+            {profileFocused && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                {filteredProfiles.map((p, idx) => (
+                  <div 
+                    key={idx}
+                    onMouseDown={() => handleSelectOption("profileQuery", profileQuery, p)}
+                    className="px-3 py-2 text-xs text-slate-700 hover:bg-sky-50 hover:text-[#00A5EC] font-semibold cursor-pointer transition-colors"
+                  >
+                    {p}
+                  </div>
+                ))}
+                {filteredProfiles.length === 0 && (
+                  <div className="px-3 py-2.5 text-xs text-slate-400 italic">No matching profiles found</div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -99,6 +162,8 @@ export default function FilterSidebar({
               placeholder="e.g. Bangalore" 
               value={locationQuery}
               onChange={(e) => handleTextChange("locationQuery", e)}
+              onFocus={() => setLocationFocused(true)}
+              onBlur={() => setTimeout(() => setLocationFocused(false), 200)}
               className="w-full px-2.5 py-1.5 text-xs border border-[#e0e0e0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00A5EC]/20 focus:border-[#00A5EC] transition-all text-slate-805 bg-white font-medium placeholder:text-slate-400"
             />
             {locationQuery && (
@@ -108,6 +173,24 @@ export default function FilterSidebar({
               >
                 ✕
               </button>
+            )}
+
+            {/* Location suggestions pop-up */}
+            {locationFocused && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                {filteredLocations.map((l, idx) => (
+                  <div 
+                    key={idx}
+                    onMouseDown={() => handleSelectOption("locationQuery", locationQuery, l)}
+                    className="px-3 py-2 text-xs text-slate-700 hover:bg-sky-50 hover:text-[#00A5EC] font-semibold cursor-pointer transition-colors"
+                  >
+                    {l}
+                  </div>
+                ))}
+                {filteredLocations.length === 0 && (
+                  <div className="px-3 py-2.5 text-xs text-slate-400 italic">No matching locations found</div>
+                )}
+              </div>
             )}
           </div>
           

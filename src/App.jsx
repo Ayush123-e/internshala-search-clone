@@ -16,7 +16,8 @@ import {
   ArrowRight,
   TrendingUp,
   X,
-  Menu
+  Menu,
+  Upload
 } from 'lucide-react';
 import InternshipCard from "./components/InternshipCard";
 import FilterSidebar from "./components/FilterSidebar";
@@ -28,6 +29,46 @@ function App() {
 
   // API State Variables
   const [allInternships, setAllInternships] = useState([]);
+
+  // Extract separate unique profiles and locations lists programmatically on mount/change
+  const uniqueProfiles = React.useMemo(() => {
+    const set = new Set();
+    allInternships.forEach(item => {
+      if (item.profileName) {
+        set.add(item.profileName.trim());
+      } else if (item.title) {
+        const cleanTitle = item.title.replace(/intern(ship)?/i, "").trim();
+        if (cleanTitle && cleanTitle.length > 2) {
+          set.add(cleanTitle);
+        } else {
+          set.add(item.title.trim());
+        }
+      }
+    });
+    return Array.from(set).sort();
+  }, [allInternships]);
+
+  const uniqueLocations = React.useMemo(() => {
+    const set = new Set();
+    allInternships.forEach(item => {
+      if (item.locationNames && item.locationNames.length > 0) {
+        item.locationNames.forEach(l => {
+          if (l) set.add(l.trim());
+        });
+      } else if (item.location) {
+        const locs = item.location.split(/[,;]+/);
+        locs.forEach(l => {
+          const cleanL = l.trim();
+          const lower = cleanL.toLowerCase();
+          if (cleanL && lower !== "work from home" && lower !== "remote" && lower !== "in office") {
+            set.add(cleanL);
+          }
+        });
+      }
+    });
+    return Array.from(set).sort();
+  }, [allInternships]);
+
   const [filteredInternships, setFilteredInternships] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,6 +95,7 @@ function App() {
 
   // Application & Detail Modal State Variables
   const [selectedInternship, setSelectedInternship] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [appliedList, setAppliedList] = useState([]);
   const [applicationSuccess, setApplicationSuccess] = useState(null);
 
@@ -129,7 +171,9 @@ function App() {
       skills: skills,
       responsibilities: responsibilities,
       perks: ["Certificate of Internship", "Letter of Recommendation", "Flexible Work Hours", "5 Days a Week"],
-      openings: (item.id % 5) + 2
+      openings: (item.id % 5) + 2,
+      profileName: item.profile_name,
+      locationNames: item.location_names || []
     };
   };
 
@@ -208,18 +252,26 @@ function App() {
     }
 
     if (profileQuery.trim()) {
-      const q = profileQuery.toLowerCase();
-      result = result.filter(item => 
-        item.title.toLowerCase().includes(q) ||
-        item.tags.some(tag => tag.toLowerCase().includes(q))
-      );
+      const profiles = profileQuery.split(/[,;]+/).map(p => p.trim().toLowerCase()).filter(Boolean);
+      if (profiles.length > 0) {
+        result = result.filter(item => 
+          profiles.some(p => 
+            item.title.toLowerCase().includes(p) ||
+            item.tags.some(tag => tag.toLowerCase().includes(p))
+          )
+        );
+      }
     }
 
     if (locationQuery.trim()) {
-      const q = locationQuery.toLowerCase();
-      result = result.filter(item => 
-        item.location.toLowerCase().includes(q)
-      );
+      const locations = locationQuery.split(/[,;]+/).map(l => l.trim().toLowerCase()).filter(Boolean);
+      if (locations.length > 0) {
+        result = result.filter(item => 
+          locations.some(l => 
+            item.location.toLowerCase().includes(l)
+          )
+        );
+      }
     }
 
     if (wfhOnly) {
@@ -474,6 +526,8 @@ function App() {
               filterCriteria={filterCriteria}
               onFilterChange={handleFilterChange}
               onClearAll={handleClearAll}
+              uniqueProfiles={uniqueProfiles}
+              uniqueLocations={uniqueLocations}
             />
           </div>
 
@@ -627,10 +681,13 @@ function App() {
                     isBookmarked={bookmarkedList.includes(internship.id)}
                     isApplied={appliedList.includes(internship.id)}
                     onToggleBookmark={toggleBookmark}
-                    onViewDetails={() => setSelectedInternship(internship)}
+                    onViewDetails={() => {
+                      setSelectedInternship(internship);
+                      setSelectedFile(null);
+                    }}
                     onApply={() => {
-                      setAppliedList([...appliedList, internship.id]);
-                      setApplicationSuccess(internship);
+                      setSelectedInternship(internship);
+                      setSelectedFile(null);
                     }}
                   />
                 ))
@@ -692,6 +749,8 @@ function App() {
                   filterCriteria={filterCriteria}
                   onFilterChange={handleFilterChange}
                   onClearAll={handleClearAll}
+                  uniqueProfiles={uniqueProfiles}
+                  uniqueLocations={uniqueLocations}
                 />
               </div>
             </div>
@@ -818,6 +877,48 @@ function App() {
                 </div>
               </div>
 
+              {/* Upload Resume */}
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Upload Resume</h4>
+                
+                {selectedFile ? (
+                  <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-250 rounded-xl text-emerald-800 text-xs font-semibold">
+                    <CheckCircle className="h-4.5 w-4.5 text-emerald-650 shrink-0 animate-bounce" />
+                    <div className="flex-1 min-w-0">
+                      <span className="block truncate text-slate-750 font-bold">Selected Resume: {selectedFile.name}</span>
+                      <span className="text-[10px] text-emerald-650 font-medium">{(selectedFile.size / (1024 * 1024)).toFixed(1)} MB</span>
+                    </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile(null);
+                      }}
+                      className="text-rose-600 hover:text-rose-700 cursor-pointer hover:underline text-[11px] font-bold"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center p-6 bg-slate-50 border-2 border-dashed border-slate-200/70 hover:border-[#00A5EC]/45 hover:bg-[#E8F7FD]/10 rounded-xl cursor-pointer transition-all text-center group">
+                    <Upload className="h-6 w-6 text-slate-400 mb-2 group-hover:text-[#00A5EC] transition-colors shrink-0" />
+                    <span className="text-xs font-bold text-slate-700 block">Click or Drag & Drop PDF Resume here</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">PDF only (Max 5MB)</span>
+                    <input 
+                      type="file" 
+                      accept=".pdf" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setSelectedFile(e.target.files[0]);
+                        } else {
+                          setSelectedFile({ name: "ayush_cv.pdf", size: 1.2 * 1024 * 1024 });
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+
               {/* Perks Offered */}
               <div className="space-y-2.5">
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Perks & Incentives</h4>
@@ -872,10 +973,11 @@ function App() {
                     onClick={() => {
                       setAppliedList([...appliedList, selectedInternship.id]);
                       setApplicationSuccess(selectedInternship);
+                      setSelectedInternship(null);
                     }}
                     className="px-6 py-2.5 text-xs font-bold text-white bg-[#00A5EC] hover:bg-[#0084BD] rounded-lg shadow-md shadow-[#00A5EC]/10 transition-all cursor-pointer"
                   >
-                    Apply Now
+                    Submit Application
                   </button>
                 )}
               </div>
