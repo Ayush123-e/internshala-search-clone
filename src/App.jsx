@@ -85,6 +85,7 @@ function App() {
     ppoOnly: false
   });
   const [globalSearch, setGlobalSearch] = useState("");
+  const [sortBy, setSortBy] = useState("relevant");
 
   const handleFilterChange = (key, value) => {
     setFilterCriteria(prev => ({
@@ -317,8 +318,28 @@ function App() {
       result = result.filter(item => item.jobOffer);
     }
 
+    if (sortBy === "stipendHighToLow") {
+      result.sort((a, b) => {
+        const getVal = (item) => {
+          const stipendStr = item.stipend || "";
+          const cleanStr = stipendStr.replace(/[^\d]/g, "");
+          return cleanStr ? parseInt(cleanStr, 10) : 0;
+        };
+        return getVal(b) - getVal(a);
+      });
+    } else if (sortBy === "durationShortToLong") {
+      result.sort((a, b) => {
+        const getVal = (item) => {
+          const durationStr = item.duration || "";
+          const match = durationStr.match(/\d+/);
+          return match ? parseInt(match[0], 10) : 999;
+        };
+        return getVal(a) - getVal(b);
+      });
+    }
+
     setFilteredInternships(result);
-  }, [allInternships, globalSearch, filterCriteria]);
+  }, [allInternships, globalSearch, filterCriteria, sortBy]);
 
   const handleClearAll = () => {
     setFilterCriteria({
@@ -331,6 +352,7 @@ function App() {
       ppoOnly: false
     });
     setGlobalSearch("");
+    setSortBy("relevant");
   };
 
   const { profileQuery, locationQuery, wfhOnly, partTimeOnly, minStipend, maxDuration, ppoOnly } = filterCriteria;
@@ -551,7 +573,13 @@ function App() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
               <div>
                 <h2 className="text-sm md:text-base font-bold text-slate-800 flex items-center gap-2">
-                  <span>{loading ? "Fetching Internships..." : `${filteredInternships.length} Web Development Internships`}</span>
+                  <span>
+                    {loading
+                      ? "Fetching Internships..."
+                      : profileQuery && profileQuery.trim()
+                      ? `${filteredInternships.length} ${profileQuery.trim()} Internships`
+                      : `${filteredInternships.length} Total Internships`}
+                  </span>
                   <span className="px-2 py-0.5 bg-[#E8F7FD] text-[#00A5EC] text-[10px] rounded-full font-bold">Active</span>
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5 font-medium">Showing handpicked matches for your search</p>
@@ -560,10 +588,15 @@ function App() {
               {/* Quick sort / Toggle */}
               <div className="flex items-center gap-2 self-start sm:self-auto">
                 <span className="text-xs text-slate-500 font-medium">Sort by:</span>
-                <button className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
-                  <span>Most Relevant</span>
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
+                <select 
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 focus:outline-none transition-colors cursor-pointer"
+                >
+                  <option value="relevant">Most Relevant</option>
+                  <option value="stipendHighToLow">Stipend: High to Low</option>
+                  <option value="durationShortToLong">Duration: Short to Long</option>
+                </select>
               </div>
             </div>
 
