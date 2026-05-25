@@ -25,12 +25,10 @@ import FilterSidebar from "./components/FilterSidebar";
 function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
-  const [bookmarkedList, setBookmarkedList] = useState([65532]); // Google is bookmarked by default
+  const [bookmarkedList, setBookmarkedList] = useState([65532]);
 
-  // API State Variables
   const [allInternships, setAllInternships] = useState([]);
 
-  // Extract separate unique profiles and locations lists programmatically on mount/change
   const uniqueProfiles = React.useMemo(() => {
     const set = new Set();
     allInternships.forEach(item => {
@@ -74,10 +72,10 @@ function App() {
   const [error, setError] = useState(null);
   const [isDemoFallback, setIsDemoFallback] = useState(false);
 
-  // Dynamic Unified Filtering State Criteria
+  // Dynamic Unified Filtering State Criteria (Initialized as Safe Arrays)
   const [filterCriteria, setFilterCriteria] = useState({
-    profileQuery: "",
-    locationQuery: "",
+    selectedProfiles: [],
+    selectedLocations: [],
     wfhOnly: false,
     partTimeOnly: false,
     minStipend: 0,
@@ -111,7 +109,11 @@ function App() {
     "bg-violet-500"
   ];
 
-  // Helper function to map API internships to our state model
+  /**
+   * Helper function to normalize raw objects to UI components
+   * @param {Object} item Raw JSON object
+   * @returns {Object} Structured UI metadata object
+   */
   const parseInternship = (item) => {
     const title = item.title || "Intern";
     const company = item.company_name || "Internshala Partner";
@@ -173,6 +175,7 @@ function App() {
       responsibilities: responsibilities,
       perks: ["Certificate of Internship", "Letter of Recommendation", "Flexible Work Hours", "5 Days a Week"],
       openings: (item.id % 5) + 2,
+      profile: item.profile_name || title,
       profileName: item.profile_name,
       locationNames: item.location_names || []
     };
@@ -238,10 +241,18 @@ function App() {
     }
   };
 
-  // Dynamic Filtering Logic Effect
+  // Dynamic Filtering Logic Effect (Foolproof Loop Implementation)
   useEffect(() => {
     let result = [...allInternships];
-    const { profileQuery, locationQuery, wfhOnly, partTimeOnly, minStipend, maxDuration, ppoOnly } = filterCriteria;
+    const { 
+      selectedProfiles = [], 
+      selectedLocations = [], 
+      wfhOnly, 
+      partTimeOnly, 
+      minStipend, 
+      maxDuration, 
+      ppoOnly 
+    } = filterCriteria;
 
     if (globalSearch.trim()) {
       const q = globalSearch.toLowerCase();
@@ -252,28 +263,18 @@ function App() {
       );
     }
 
-    if (profileQuery.trim()) {
-      const profiles = profileQuery.split(/[,;]+/).map(p => p.trim().toLowerCase()).filter(Boolean);
-      if (profiles.length > 0) {
-        result = result.filter(item => 
-          profiles.some(p => 
-            item.title.toLowerCase().includes(p) ||
-            item.tags.some(tag => tag.toLowerCase().includes(p))
-          )
-        );
-      }
-    }
+    // Foolproof Profile Filter Loop
+    result = result.filter(item => {
+      if (selectedProfiles.length === 0) return true;
+      return selectedProfiles.includes(item.profile);
+    });
 
-    if (locationQuery.trim()) {
-      const locations = locationQuery.split(/[,;]+/).map(l => l.trim().toLowerCase()).filter(Boolean);
-      if (locations.length > 0) {
-        result = result.filter(item => 
-          locations.some(l => 
-            item.location.toLowerCase().includes(l)
-          )
-        );
-      }
-    }
+    // Foolproof Location Filter Loop
+    result = result.filter(item => {
+      if (selectedLocations.length === 0) return true;
+      if (!item.location) return false;
+      return item.location.split(',').some(loc => selectedLocations.includes(loc.trim()));
+    });
 
     if (wfhOnly) {
       result = result.filter(item => 
@@ -343,8 +344,8 @@ function App() {
 
   const handleClearAll = () => {
     setFilterCriteria({
-      profileQuery: "",
-      locationQuery: "",
+      selectedProfiles: [],
+      selectedLocations: [],
       wfhOnly: false,
       partTimeOnly: false,
       minStipend: 0,
@@ -355,12 +356,12 @@ function App() {
     setSortBy("relevant");
   };
 
-  const { profileQuery, locationQuery, wfhOnly, partTimeOnly, minStipend, maxDuration, ppoOnly } = filterCriteria;
+  const { selectedProfiles = [], selectedLocations = [], wfhOnly, partTimeOnly, minStipend, maxDuration, ppoOnly } = filterCriteria;
 
   const hasActiveFilters = !!(
     globalSearch.trim() || 
-    profileQuery.trim() || 
-    locationQuery.trim() || 
+    selectedProfiles.length > 0 || 
+    selectedLocations.length > 0 || 
     wfhOnly || 
     partTimeOnly || 
     minStipend > 0 || 
@@ -371,11 +372,10 @@ function App() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col font-sans selection:bg-[#00A5EC] selection:text-white">
       
-      {/* --- TOP NAVBAR --- */}
+      {/* --- HEADER --- */}
       <header className="bg-white sticky top-0 z-40 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           
-          {/* Logo & Navigation */}
           <div className="flex items-center gap-8">
             <a href="#" className="flex items-center gap-2 group">
               <img 
@@ -385,7 +385,6 @@ function App() {
               />
             </a>
 
-            {/* Desktop Navigation Links */}
             <nav className="hidden md:flex items-center gap-1">
               <a href="#" className="px-3 py-2 text-sm font-semibold text-[#00A5EC] bg-[#E8F7FD] rounded-lg">
                 Internships
@@ -403,9 +402,7 @@ function App() {
             </nav>
           </div>
 
-          {/* Right Actions */}
           <div className="hidden md:flex items-center gap-4">
-            {/* Search Input in Navbar */}
             <div className="relative w-64">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
                 <Search className="h-4 w-4" />
@@ -434,7 +431,7 @@ function App() {
             </button>
           </div>
 
-          {/* Mobile Menu & Filter Buttons */}
+          {/* Mobile Action Controls */}
           <div className="flex items-center gap-2 md:hidden">
             <button 
               onClick={() => setIsFilterDrawerOpen(true)}
@@ -454,7 +451,7 @@ function App() {
 
         </div>
 
-        {/* Mobile Navigation Drawer */}
+        {/* Mobile Navigation Panel */}
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-slate-200 bg-white py-3 px-4 flex flex-col gap-1.5 shadow-inner">
             <div className="relative mb-2">
@@ -495,7 +492,7 @@ function App() {
         )}
       </header>
 
-      {/* --- HERO / SEARCH PROMPT AREA --- */}
+      {/* --- HERO / SEARCH CONTEXT --- */}
       <section className="bg-gradient-to-r from-[#00A5EC] to-[#0084BD] py-8 px-4 text-white text-center shadow-inner relative overflow-hidden">
         <div className="absolute top-0 left-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-sky-400/20 rounded-full blur-3xl translate-x-1/3 translate-y-1/3"></div>
@@ -512,7 +509,6 @@ function App() {
             Explore thousands of handpicked high-stipend internships, remote gigs, and starting roles curated for ambitious students.
           </p>
           
-          {/* Main search card */}
           <div className="bg-white p-1.5 rounded-xl shadow-md max-w-2xl mx-auto flex flex-col sm:flex-row gap-1.5">
             <div className="flex-1 flex items-center px-3 gap-2 border-b sm:border-b-0 sm:border-r border-slate-100 py-1.5">
               <Search className="h-4 w-4 text-slate-400 shrink-0" />
@@ -576,8 +572,8 @@ function App() {
                   <span>
                     {loading
                       ? "Fetching Internships..."
-                      : profileQuery && profileQuery.trim()
-                      ? `${filteredInternships.length} ${profileQuery.trim()} Internships`
+                      : selectedProfiles && selectedProfiles.length > 0
+                      ? `${filteredInternships.length} ${selectedProfiles.join(", ")} Internships`
                       : `${filteredInternships.length} Total Internships`}
                   </span>
                   <span className="px-2 py-0.5 bg-[#E8F7FD] text-[#00A5EC] text-[10px] rounded-full font-bold">Active</span>
@@ -585,7 +581,7 @@ function App() {
                 <p className="text-xs text-slate-400 mt-0.5 font-medium">Showing handpicked matches for your search</p>
               </div>
 
-              {/* Quick sort / Toggle */}
+              {/* Quick sort / Toggle select */}
               <div className="flex items-center gap-2 self-start sm:self-auto">
                 <span className="text-xs text-slate-500 font-medium">Sort by:</span>
                 <select 
@@ -600,7 +596,7 @@ function App() {
               </div>
             </div>
 
-            {/* Active Badges Panel */}
+            {/* Active Badges Panel (Fully Reactive Multi-Select representation) */}
             <div className="flex flex-wrap items-center gap-2 bg-slate-100/50 p-3 rounded-xl border border-slate-200/40">
               <span className="text-xs text-slate-400 font-semibold mr-1">Active filters:</span>
               
@@ -615,19 +611,19 @@ function App() {
                 </span>
               )}
 
-              {profileQuery.trim() && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 text-slate-700 text-xs rounded-full shadow-sm font-medium">
-                  <span>Profile: {profileQuery}</span>
-                  <X onClick={() => handleFilterChange("profileQuery", "")} className="h-3 w-3 text-slate-400 hover:text-[#00A5EC] cursor-pointer" />
+              {selectedProfiles && selectedProfiles.map((p, idx) => (
+                <span key={`p-${idx}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 text-slate-700 text-xs rounded-full shadow-sm font-medium">
+                  <span>Profile: {p}</span>
+                  <X onClick={() => handleFilterChange("selectedProfiles", selectedProfiles.filter(item => item !== p))} className="h-3 w-3 text-slate-400 hover:text-[#00A5EC] cursor-pointer" />
                 </span>
-              )}
+              ))}
 
-              {locationQuery.trim() && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 text-slate-700 text-xs rounded-full shadow-sm font-medium">
-                  <span>Location: {locationQuery}</span>
-                  <X onClick={() => handleFilterChange("locationQuery", "")} className="h-3 w-3 text-slate-400 hover:text-[#00A5EC] cursor-pointer" />
+              {selectedLocations && selectedLocations.map((l, idx) => (
+                <span key={`l-${idx}`} className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 text-slate-700 text-xs rounded-full shadow-sm font-medium">
+                  <span>Location: {l}</span>
+                  <X onClick={() => handleFilterChange("selectedLocations", selectedLocations.filter(item => item !== l))} className="h-3 w-3 text-slate-400 hover:text-[#00A5EC] cursor-pointer" />
                 </span>
-              )}
+              ))}
 
               {wfhOnly && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 text-slate-700 text-xs rounded-full shadow-sm font-medium">
@@ -698,12 +694,12 @@ function App() {
                     </div>
                   ))}
                 </div>
-              ) : filteredInternships.length === 0 ? (
-                // Empty State Alert
+              ) : !filteredInternships || filteredInternships.length === 0 ? (
+                // Safe Crash-Prevention Empty State Alert
                 <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
                   <Briefcase className="h-10 w-10 text-slate-300 mx-auto mb-4" />
                   <h3 className="text-sm font-bold text-slate-800">No Internships Found</h3>
-                  <p className="text-xs text-slate-500 mt-1">Try adjusting your active search filters or check back later.</p>
+                  <p className="text-xs text-slate-500 mt-1">No internships match your selected filters. Try clearing some filters.</p>
                 </div>
               ) : (
                 // Active dynamic card rendering
@@ -824,7 +820,7 @@ function App() {
               </div>
               <button 
                 onClick={() => setSelectedInternship(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-655 hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -988,7 +984,7 @@ function App() {
               <div className="flex gap-3">
                 <button 
                   onClick={() => setSelectedInternship(null)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-200 rounded-lg transition-all cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-slate-650 hover:text-slate-800 bg-white border border-slate-200 rounded-lg transition-all cursor-pointer"
                 >
                   Close
                 </button>

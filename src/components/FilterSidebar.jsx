@@ -8,8 +8,8 @@ import { Filter, Sparkles } from "lucide-react";
  * 
  * @param {Object} props
  * @param {Object} props.filterCriteria Object holding all active filter selections
- * @param {string} props.filterCriteria.profileQuery Profile query string
- * @param {string} props.filterCriteria.locationQuery Location query string
+ * @param {Array} props.filterCriteria.selectedProfiles Selected profiles list
+ * @param {Array} props.filterCriteria.selectedLocations Selected locations list
  * @param {boolean} props.filterCriteria.wfhOnly Work From Home configuration
  * @param {boolean} props.filterCriteria.partTimeOnly Part Time configuration
  * @param {number} props.filterCriteria.minStipend Minimum stipend range selection
@@ -28,8 +28,8 @@ export default function FilterSidebar({
   uniqueLocations = []
 }) {
   const {
-    profileQuery = "",
-    locationQuery = "",
+    selectedProfiles = [],
+    selectedLocations = [],
     wfhOnly = false,
     partTimeOnly = false,
     minStipend = 0,
@@ -37,47 +37,39 @@ export default function FilterSidebar({
     ppoOnly = false
   } = filterCriteria || {};
 
-  // Dropdown visibility states
+  // Dropdown text inputs & visibility states
+  const [profileInput, setProfileInput] = React.useState("");
+  const [locationInput, setLocationInput] = React.useState("");
   const [profileFocused, setProfileFocused] = React.useState(false);
   const [locationFocused, setLocationFocused] = React.useState(false);
 
-  // Helper: Get active query segment after the last comma
-  const getCurrentInputSegment = (queryStr) => {
-    if (!queryStr) return "";
-    const segments = queryStr.split(",");
-    return segments[segments.length - 1].trim();
-  };
-
-  // Helper: Update input state with selection (retains previous comma-separated elements)
-  const handleSelectOption = (key, currentVal, optionSelected) => {
-    const segments = currentVal.split(",");
-    if (segments.length > 1) {
-      segments[segments.length - 1] = " " + optionSelected;
-      onFilterChange && onFilterChange(key, segments.join(", "));
-    } else {
-      onFilterChange && onFilterChange(key, optionSelected);
-    }
-  };
-
-  // Dynamic suggestion lists based on active segment input
+  // Dynamic suggestion lists based on active typed input, removing already selected choices
   const filteredProfiles = React.useMemo(() => {
-    const segment = getCurrentInputSegment(profileQuery).toLowerCase();
-    if (!segment) return uniqueProfiles.slice(0, 10);
-    return uniqueProfiles
-      .filter(p => p.toLowerCase().includes(segment))
-      .slice(0, 10);
-  }, [uniqueProfiles, profileQuery]);
+    const q = profileInput.trim().toLowerCase();
+    const unselected = uniqueProfiles.filter(p => !selectedProfiles.includes(p));
+    if (!q) return unselected.slice(0, 10);
+    return unselected.filter(p => p.toLowerCase().includes(q)).slice(0, 10);
+  }, [uniqueProfiles, profileInput, selectedProfiles]);
 
   const filteredLocations = React.useMemo(() => {
-    const segment = getCurrentInputSegment(locationQuery).toLowerCase();
-    if (!segment) return uniqueLocations.slice(0, 10);
-    return uniqueLocations
-      .filter(l => l.toLowerCase().includes(segment))
-      .slice(0, 10);
-  }, [uniqueLocations, locationQuery]);
+    const q = locationInput.trim().toLowerCase();
+    const unselected = uniqueLocations.filter(l => !selectedLocations.includes(l));
+    if (!q) return unselected.slice(0, 10);
+    return unselected.filter(l => l.toLowerCase().includes(q)).slice(0, 10);
+  }, [uniqueLocations, locationInput, selectedLocations]);
 
-  const handleTextChange = (key, e) => {
-    onFilterChange && onFilterChange(key, e.target.value);
+  const handleSelectProfile = (p) => {
+    if (!selectedProfiles.includes(p)) {
+      onFilterChange && onFilterChange("selectedProfiles", [...selectedProfiles, p]);
+    }
+    setProfileInput("");
+  };
+
+  const handleSelectLocation = (l) => {
+    if (!selectedLocations.includes(l)) {
+      onFilterChange && onFilterChange("selectedLocations", [...selectedLocations, l]);
+    }
+    setLocationInput("");
   };
 
   const handleCheckboxChange = (key, e) => {
@@ -114,24 +106,35 @@ export default function FilterSidebar({
         {/* Profile Filter Group */}
         <div>
           <label className="block text-[10.5px] font-semibold text-slate-400 uppercase tracking-wider mb-1">PROFILE / DOMAIN</label>
+          
+          {/* Active Chips representation */}
+          {selectedProfiles.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {selectedProfiles.map((p, idx) => (
+                <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-50 text-[#00A5EC] text-xs font-bold border border-sky-100/70 shadow-sm">
+                  {p}
+                  <button 
+                    type="button"
+                    onClick={() => onFilterChange && onFilterChange("selectedProfiles", selectedProfiles.filter(item => item !== p))}
+                    className="text-[#00A5EC] hover:text-[#0084BD] font-bold text-[10px] ml-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="relative">
             <input 
               type="text" 
-              placeholder="e.g. React Developer" 
-              value={profileQuery}
-              onChange={(e) => handleTextChange("profileQuery", e)}
+              placeholder={selectedProfiles.length > 0 ? "Add another profile..." : "e.g. React Developer"}
+              value={profileInput}
+              onChange={(e) => setProfileInput(e.target.value)}
               onFocus={() => setProfileFocused(true)}
               onBlur={() => setTimeout(() => setProfileFocused(false), 200)}
               className="w-full px-2.5 py-1.5 text-xs border border-[#e0e0e0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00A5EC]/20 focus:border-[#00A5EC] transition-all text-slate-805 bg-white font-medium placeholder:text-slate-400"
             />
-            {profileQuery && (
-              <button 
-                onClick={() => onFilterChange && onFilterChange("profileQuery", "")}
-                className="absolute right-2 top-2 text-xs text-slate-400 hover:text-slate-650 cursor-pointer"
-              >
-                ✕
-              </button>
-            )}
 
             {/* Profile suggestions pop-up */}
             {profileFocused && (
@@ -139,7 +142,7 @@ export default function FilterSidebar({
                 {filteredProfiles.map((p, idx) => (
                   <div 
                     key={idx}
-                    onMouseDown={() => handleSelectOption("profileQuery", profileQuery, p)}
+                    onMouseDown={() => handleSelectProfile(p)}
                     className="px-3 py-2 text-xs text-slate-700 hover:bg-sky-50 hover:text-[#00A5EC] font-semibold cursor-pointer transition-colors"
                   >
                     {p}
@@ -156,24 +159,35 @@ export default function FilterSidebar({
         {/* Location Filter Group */}
         <div>
           <label className="block text-[10.5px] font-semibold text-slate-400 uppercase tracking-wider mb-1">LOCATION</label>
+          
+          {/* Active Chips representation */}
+          {selectedLocations.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {selectedLocations.map((l, idx) => (
+                <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-50 text-[#00A5EC] text-xs font-bold border border-sky-100/70 shadow-sm">
+                  {l}
+                  <button 
+                    type="button"
+                    onClick={() => onFilterChange && onFilterChange("selectedLocations", selectedLocations.filter(item => item !== l))}
+                    className="text-[#00A5EC] hover:text-[#0084BD] font-bold text-[10px] ml-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="relative mb-2.5">
             <input 
               type="text" 
-              placeholder="e.g. Bangalore" 
-              value={locationQuery}
-              onChange={(e) => handleTextChange("locationQuery", e)}
+              placeholder={selectedLocations.length > 0 ? "Add another location..." : "e.g. Bangalore"}
+              value={locationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
               onFocus={() => setLocationFocused(true)}
               onBlur={() => setTimeout(() => setLocationFocused(false), 200)}
               className="w-full px-2.5 py-1.5 text-xs border border-[#e0e0e0] rounded-md focus:outline-none focus:ring-2 focus:ring-[#00A5EC]/20 focus:border-[#00A5EC] transition-all text-slate-805 bg-white font-medium placeholder:text-slate-400"
             />
-            {locationQuery && (
-              <button 
-                onClick={() => onFilterChange && onFilterChange("locationQuery", "")}
-                className="absolute right-2 top-2 text-xs text-slate-400 hover:text-slate-650 cursor-pointer"
-              >
-                ✕
-              </button>
-            )}
 
             {/* Location suggestions pop-up */}
             {locationFocused && (
@@ -181,7 +195,7 @@ export default function FilterSidebar({
                 {filteredLocations.map((l, idx) => (
                   <div 
                     key={idx}
-                    onMouseDown={() => handleSelectOption("locationQuery", locationQuery, l)}
+                    onMouseDown={() => handleSelectLocation(l)}
                     className="px-3 py-2 text-xs text-slate-700 hover:bg-sky-50 hover:text-[#00A5EC] font-semibold cursor-pointer transition-colors"
                   >
                     {l}
